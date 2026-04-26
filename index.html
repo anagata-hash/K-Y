@@ -1,1 +1,1246 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FMEA ロジックツリー | 設計現場向け構成部品レベル分解</title>
+<style>
+:root{
+  --bg:#0f1117;--bg2:#161b27;--bg3:#1e2436;--bg4:#252d42;
+  --border:#2a3350;--border2:#3a4668;
+  --text:#e8ecf4;--text2:#8b9ab8;--text3:#5a6a8a;
+  --red:#ff4d6d;--red2:#c9184a;--red-bg:rgba(255,77,109,.12);
+  --orange:#ff8800;--orange-bg:rgba(255,136,0,.12);
+  --blue:#4a9eff;--blue2:#2563eb;--blue-bg:rgba(74,158,255,.12);
+  --green:#22d47a;--green-bg:rgba(34,212,122,.12);
+  --yellow:#ffd166;--yellow-bg:rgba(255,209,102,.12);
+  --purple:#b197fc;--purple-bg:rgba(177,151,252,.12);
+  --teal:#2dd4bf;--teal-bg:rgba(45,212,191,.12);
+  --radius:8px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Hiragino Sans","Yu Gothic UI","Meiryo",sans-serif;
+  background:var(--bg);color:var(--text);min-height:100vh;overflow:hidden;}
 
+/* ── Layout ── */
+.app{display:flex;flex-direction:column;height:100vh;}
+
+.topbar{
+  background:linear-gradient(90deg,#0d1220,#131929);
+  border-bottom:1px solid var(--border);
+  padding:0 20px;height:52px;display:flex;align-items:center;gap:16px;flex-shrink:0;
+}
+.logo{display:flex;align-items:center;gap:8px;}
+.logo-mark{width:28px;height:28px;background:linear-gradient(135deg,var(--blue),var(--purple));
+  border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;}
+.logo-text{font-size:14px;font-weight:700;color:var(--text);letter-spacing:.04em;}
+.logo-sub{font-size:10px;color:var(--text3);margin-left:4px;}
+.topbar-chips{display:flex;gap:6px;margin-left:auto;}
+.chip{font-size:10px;padding:2px 8px;border-radius:20px;border:1px solid var(--border2);color:var(--text2);}
+.chip-blue{border-color:var(--blue);color:var(--blue);background:var(--blue-bg);}
+
+.body{display:flex;flex:1;overflow:hidden;}
+
+/* ── Left nav ── */
+.nav{width:220px;background:var(--bg2);border-right:1px solid var(--border);
+  display:flex;flex-direction:column;flex-shrink:0;overflow-y:auto;}
+.nav-section{padding:12px 10px 4px;font-size:10px;color:var(--text3);
+  letter-spacing:.08em;text-transform:uppercase;font-weight:600;}
+.sys-item{display:block;padding:8px 12px;cursor:pointer;border-left:3px solid transparent;
+  font-size:12px;color:var(--text2);transition:all .15s;line-height:1.3;}
+.sys-item:hover{background:var(--bg3);color:var(--text);}
+.sys-item.active{border-left-color:var(--blue);background:var(--blue-bg);color:var(--blue);}
+.sys-item .sys-name{font-weight:600;}
+.sys-item .sys-meta{font-size:10px;color:var(--text3);margin-top:1px;}
+.sys-item.active .sys-meta{color:rgba(74,158,255,.6);}
+
+.part-group{padding:2px 0;}
+.part-group-label{padding:6px 12px 2px 24px;font-size:10px;color:var(--text3);font-weight:600;}
+.part-item{display:block;padding:6px 12px 6px 28px;cursor:pointer;
+  font-size:11px;color:var(--text3);transition:all .12s;border-left:3px solid transparent;}
+.part-item:hover{background:var(--bg3);color:var(--text2);}
+.part-item.active{border-left-color:var(--teal);color:var(--teal);background:var(--teal-bg);}
+.part-item .pname{font-weight:600;}
+.part-item .pmeta{font-size:9px;color:var(--text3);margin-top:1px;}
+.part-item.active .pmeta{color:rgba(45,212,191,.5);}
+.fault-count{display:inline-block;font-size:9px;padding:1px 5px;border-radius:10px;
+  background:var(--red-bg);color:var(--red);margin-left:4px;font-weight:600;}
+
+/* ── Center: tree canvas ── */
+.center{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+.center-header{
+  background:var(--bg2);border-bottom:1px solid var(--border);
+  padding:10px 16px;display:flex;align-items:center;gap:12px;flex-shrink:0;
+}
+.breadcrumb{font-size:11px;color:var(--text3);display:flex;align-items:center;gap:6px;}
+.breadcrumb span{color:var(--text2);}
+.breadcrumb .active{color:var(--teal);font-weight:600;}
+.bc-sep{color:var(--border2);}
+.view-btns{display:flex;gap:0;border:1px solid var(--border2);border-radius:6px;overflow:hidden;margin-left:auto;}
+.vbtn{padding:4px 12px;font-size:11px;background:transparent;border:none;
+  color:var(--text3);cursor:pointer;font-family:inherit;transition:all .12s;}
+.vbtn:hover{color:var(--text2);}
+.vbtn.active{background:var(--blue2);color:#fff;}
+
+.tree-scroll{flex:1;overflow:auto;padding:20px;}
+
+/* ── Tree nodes ── */
+.tree-wrap{position:relative;min-height:200px;}
+
+/* Fault event (leftmost - RED) */
+.node-fault{
+  position:absolute;
+  background:linear-gradient(135deg,rgba(201,24,74,.9),rgba(255,77,109,.7));
+  border:1px solid var(--red);border-radius:var(--radius);
+  color:#fff;font-size:11px;font-weight:700;
+  padding:8px 10px;text-align:center;cursor:pointer;
+  box-shadow:0 0 16px rgba(255,77,109,.2);
+  transition:all .15s;line-height:1.4;
+}
+.node-fault:hover{box-shadow:0 0 24px rgba(255,77,109,.4);transform:translateY(-1px);}
+.node-fault.selected{box-shadow:0 0 0 2px #fff,0 0 0 4px var(--red),0 0 24px rgba(255,77,109,.4);}
+
+/* L1 - mechanism (ORANGE) */
+.node-l1{
+  position:absolute;
+  background:linear-gradient(135deg,rgba(180,80,0,.8),rgba(255,136,0,.6));
+  border:1px solid var(--orange);border-radius:var(--radius);
+  color:#fff;font-size:11px;font-weight:600;
+  padding:7px 9px;text-align:center;cursor:pointer;
+  transition:all .15s;line-height:1.4;
+}
+.node-l1:hover{box-shadow:0 0 16px rgba(255,136,0,.3);}
+.node-l1.selected{box-shadow:0 0 0 2px var(--bg),0 0 0 4px var(--orange);}
+
+/* L2 - cause (BLUE) */
+.node-l2{
+  position:absolute;
+  background:linear-gradient(135deg,rgba(20,60,140,.9),rgba(74,158,255,.5));
+  border:1px solid var(--blue);border-radius:var(--radius);
+  color:#fff;font-size:11px;font-weight:600;
+  padding:7px 9px;text-align:center;cursor:pointer;
+  transition:all .15s;line-height:1.4;
+}
+.node-l2:hover{box-shadow:0 0 16px rgba(74,158,255,.3);}
+
+/* L3 - root cause (GREEN) */
+.node-l3{
+  position:absolute;
+  background:linear-gradient(135deg,rgba(10,80,50,.9),rgba(34,212,122,.5));
+  border:1px solid var(--green);border-radius:var(--radius);
+  color:#fff;font-size:11px;font-weight:600;
+  padding:7px 9px;text-align:center;cursor:pointer;
+  transition:all .15s;line-height:1.4;
+}
+.node-l3:hover{box-shadow:0 0 16px rgba(34,212,122,.3);}
+
+/* Action (YELLOW) */
+.node-action{
+  position:absolute;
+  background:rgba(255,209,102,.08);
+  border:1px dashed var(--yellow);border-radius:var(--radius);
+  color:var(--yellow);font-size:10px;font-weight:500;
+  padding:6px 8px;text-align:center;cursor:pointer;
+  transition:all .15s;line-height:1.4;
+}
+.node-action:hover{background:var(--yellow-bg);}
+
+/* Past case badge on node */
+.node-past-badge{
+  position:absolute;top:-6px;right:-6px;
+  font-size:8px;padding:1px 4px;border-radius:3px;
+  background:var(--purple);color:#1a1030;font-weight:700;
+  white-space:nowrap;
+}
+.node-check-badge{
+  position:absolute;top:-6px;right:-6px;
+  font-size:8px;padding:1px 4px;border-radius:3px;
+  background:var(--green);color:#061a10;font-weight:700;
+}
+.node-ng-badge{
+  position:absolute;top:-6px;right:-6px;
+  font-size:8px;padding:1px 4px;border-radius:3px;
+  background:var(--red);color:#fff;font-weight:700;
+}
+
+/* SVG lines */
+.tree-svg{position:absolute;top:0;left:0;pointer-events:none;overflow:visible;}
+
+/* ── Legend ── */
+.legend-bar{
+  background:var(--bg2);border-top:1px solid var(--border);
+  padding:6px 16px;display:flex;gap:16px;align-items:center;flex-shrink:0;flex-wrap:wrap;
+}
+.leg{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--text3);}
+.leg-box{width:10px;height:10px;border-radius:2px;}
+
+/* ── Right panel ── */
+.rpanel{
+  width:360px;background:var(--bg2);border-left:1px solid var(--border);
+  overflow-y:auto;flex-shrink:0;transition:width .2s;
+}
+.rpanel.closed{width:0;overflow:hidden;}
+.rp-inner{padding:16px;min-width:360px;}
+.rp-close{float:right;font-size:11px;color:var(--text3);cursor:pointer;
+  padding:2px 7px;border:1px solid var(--border2);border-radius:4px;margin-bottom:8px;}
+.rp-close:hover{color:var(--text2);background:var(--bg3);}
+.rp-title{font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px;clear:both;}
+.rp-effect{font-size:11px;color:var(--text2);line-height:1.6;
+  background:var(--red-bg);border-left:3px solid var(--red);
+  padding:7px 10px;border-radius:0 6px 6px 0;margin-bottom:12px;}
+
+/* SOD */
+.sod-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:10px;}
+.sod-cell{background:var(--bg3);border:1px solid var(--border);border-radius:6px;
+  padding:8px;text-align:center;}
+.sod-l{font-size:9px;color:var(--text3);font-weight:600;margin-bottom:3px;}
+.sod-v{font-size:26px;font-weight:800;}
+.sod-d{font-size:9px;color:var(--text3);margin-top:2px;}
+.rpn-row{display:flex;align-items:center;gap:8px;margin-bottom:14px;}
+.rpn-num{font-size:20px;font-weight:800;}
+.rpn-track{flex:1;height:5px;background:var(--bg4);border-radius:3px;overflow:hidden;}
+.rpn-fill{height:100%;border-radius:3px;transition:width .5s;}
+.rpn-badge{font-size:10px;padding:2px 8px;border-radius:3px;font-weight:700;}
+.rpn-h{background:var(--red-bg);color:var(--red);border:1px solid var(--red);}
+.rpn-m{background:var(--orange-bg);color:var(--orange);border:1px solid var(--orange);}
+.rpn-l{background:var(--green-bg);color:var(--green);border:1px solid var(--green);}
+
+/* Past cases - KEY FEATURE */
+.section-title{font-size:11px;font-weight:700;color:var(--text2);
+  padding:8px 0 6px;border-top:1px solid var(--border);margin-top:4px;
+  display:flex;align-items:center;gap:6px;}
+.past-card{border:1px solid var(--border2);border-radius:8px;margin-bottom:8px;
+  background:var(--bg3);overflow:hidden;}
+.past-head{padding:9px 11px 6px;display:flex;align-items:center;gap:7px;}
+.past-year{font-size:10px;color:var(--text3);background:var(--bg4);
+  padding:1px 6px;border-radius:3px;}
+.past-name{font-size:12px;font-weight:700;color:var(--text);flex:1;}
+.past-check{font-size:10px;padding:2px 7px;border-radius:4px;font-weight:700;}
+.check-ok{background:var(--green-bg);color:var(--green);border:1px solid var(--green);}
+.check-ng{background:var(--red-bg);color:var(--red);border:1px solid var(--red);}
+.check-partial{background:var(--orange-bg);color:var(--orange);border:1px solid var(--orange);}
+.past-body{padding:0 11px 9px;}
+.past-trouble{font-size:11px;color:var(--text2);line-height:1.6;margin-bottom:6px;}
+.past-counter{background:var(--bg4);border-radius:5px;padding:6px 8px;margin-bottom:5px;}
+.past-counter-l{font-size:9px;color:var(--text3);margin-bottom:2px;font-weight:600;}
+.past-counter-v{font-size:11px;color:var(--text);line-height:1.5;}
+.past-design-check{padding:5px 8px;border-radius:5px;font-size:11px;line-height:1.5;}
+.dc-ok{background:var(--green-bg);color:var(--green);}
+.dc-ng{background:var(--red-bg);color:var(--red);}
+.dc-partial{background:var(--orange-bg);color:var(--orange);}
+.past-refs{display:flex;gap:4px;flex-wrap:wrap;margin-top:5px;}
+.ref-tag{font-size:9px;padding:1px 6px;border-radius:3px;
+  background:var(--blue-bg);color:var(--blue);border:1px solid rgba(74,158,255,.3);cursor:pointer;}
+.ref-tag:hover{background:rgba(74,158,255,.2);}
+
+/* DB section */
+.db-card{border:1px solid var(--border);border-radius:7px;padding:8px 10px;
+  margin-bottom:6px;background:var(--bg3);cursor:pointer;transition:border-color .12s;}
+.db-card:hover{border-color:var(--blue);}
+.db-head{display:flex;align-items:center;gap:6px;margin-bottom:3px;}
+.db-icon{font-size:13px;width:18px;text-align:center;}
+.db-name{font-size:11px;font-weight:700;color:var(--blue);}
+.db-status{font-size:9px;padding:1px 5px;border-radius:3px;margin-left:auto;font-weight:600;}
+.s-read{background:var(--green-bg);color:var(--green);}
+.s-conn{background:var(--blue-bg);color:var(--blue);}
+.s-jsol{background:var(--purple-bg);color:var(--purple);}
+.db-reason{font-size:10px;color:var(--text2);line-height:1.5;margin-bottom:3px;}
+.db-tags{display:flex;gap:3px;flex-wrap:wrap;}
+.db-tag{font-size:9px;padding:1px 5px;border-radius:3px;
+  background:var(--bg4);color:var(--text3);border:1px solid var(--border);}
+
+/* Hint */
+.hint{color:var(--text3);font-size:13px;text-align:center;padding:60px 20px;}
+.hint-icon{font-size:32px;margin-bottom:12px;}
+
+/* List view */
+.fault-table{width:100%;border-collapse:collapse;font-size:11px;}
+.fault-table th{padding:8px 10px;text-align:left;color:var(--text3);
+  background:var(--bg3);border-bottom:1px solid var(--border);font-weight:600;font-size:10px;}
+.fault-table td{padding:8px 10px;border-bottom:1px solid var(--border);color:var(--text2);vertical-align:top;}
+.fault-table tr:hover td{background:var(--bg3);cursor:pointer;}
+
+/* Scrollbar */
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-track{background:var(--bg2);}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px;}
+</style>
+</head>
+<body>
+<div class="app">
+
+<div class="topbar">
+  <div class="logo">
+    <div class="logo-mark">⚙</div>
+    <span class="logo-text">FMEA ロジックツリー</span>
+    <span class="logo-sub">構成部品レベル分解 / 過去対策対応確認</span>
+  </div>
+  <div class="topbar-chips">
+    <span class="chip chip-blue">AIAG-VDA 2019</span>
+    <span class="chip">設計 D-FMEA</span>
+  </div>
+</div>
+
+<div class="body">
+
+<!-- Nav -->
+<div class="nav" id="nav"></div>
+
+<!-- Center -->
+<div class="center">
+  <div class="center-header">
+    <div class="breadcrumb" id="breadcrumb">
+      <span>システムを選択してください</span>
+    </div>
+    <div class="view-btns">
+      <button class="vbtn active" id="btn-tree" onclick="setView('tree')">ツリー</button>
+      <button class="vbtn" id="btn-list" onclick="setView('list')">リスト</button>
+    </div>
+  </div>
+  <div id="tree-view" style="display:flex;flex-direction:column;flex:1;overflow:hidden;">
+    <div class="tree-scroll" id="tree-scroll">
+      <div id="hint" class="hint">
+        <div class="hint-icon">🔍</div>
+        左のナビから<br>システム → 構成部品を選択
+      </div>
+      <div class="tree-wrap" id="canvas" style="display:none;"></div>
+    </div>
+    <div class="legend-bar">
+      <div class="leg"><div class="leg-box" style="background:var(--red)"></div>不具合事象</div>
+      <div class="leg"><div class="leg-box" style="background:var(--orange)"></div>故障メカニズム（L1）</div>
+      <div class="leg"><div class="leg-box" style="background:var(--blue)"></div>直接原因（L2）</div>
+      <div class="leg"><div class="leg-box" style="background:var(--green)"></div>根本原因（L3）</div>
+      <div class="leg"><div class="leg-box" style="background:transparent;border:1px dashed var(--yellow)"></div>対策アクション</div>
+      <div class="leg" style="margin-left:8px;"><span style="background:var(--purple);color:#1a1030;font-size:9px;padding:1px 5px;border-radius:3px;font-weight:700;">過去事例</span><span style="margin-left:4px;">過去トラブルあり</span></div>
+      <div class="leg"><span style="background:var(--green);color:#061a10;font-size:9px;padding:1px 5px;border-radius:3px;font-weight:700;">✓ 対応済</span></div>
+      <div class="leg"><span style="background:var(--red);color:#fff;font-size:9px;padding:1px 5px;border-radius:3px;font-weight:700;">! 未対応</span></div>
+    </div>
+  </div>
+  <div id="list-view" style="display:none;flex:1;overflow:auto;padding:16px;"></div>
+</div>
+
+<!-- Right panel -->
+<div class="rpanel closed" id="rpanel">
+  <div class="rp-inner" id="rp-inner"></div>
+</div>
+
+</div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// DATA
+// ═══════════════════════════════════════════════════════════════════
+
+const DB_SOURCES = {
+  past:{icon:"📁",name:"過去設計データDB",badge:"読込済",bClass:"s-read",
+    tags:["BOM表","設計仕様書","性能試験レポート","ECN/ECR"]},
+  defect:{icon:"⚠️",name:"不具合履歴DB",badge:"読込済",bClass:"s-read",
+    tags:["8Dレポート","CAPA記録","市場品質報告書","工程不良リスト"]},
+  dr:{icon:"📋",name:"DR議事録",badge:"読込済",bClass:"s-read",
+    tags:["DR1/DR2/DR3","指摘一覧","対策進捗管理表"]},
+  cad:{icon:"📐",name:"図面データ 3D-CAD",badge:"接続済",bClass:"s-conn",
+    tags:["NX/STEP/IGES","GD&T付き2D図面","アセンブリ構成表"]},
+  qc:{icon:"📊",name:"量産公差・品質基準",badge:"読込済",bClass:"s-read",
+    tags:["Cpk実績","検査基準書","QC工程表","既存FMEA"]},
+  cause_db:{icon:"🔗",name:"因果チェーンDB",badge:"JSOL知見",bClass:"s-jsol",
+    tags:["JMAG","LS-DYNA","JSTAMP","DIGIMAT"]},
+  cae:{icon:"🔬",name:"CAEテンプレート",badge:"JSOL知見",bClass:"s-jsol",
+    tags:["JMAG","LS-DYNA","Moldex3D","ODYSSEE"]},
+  shape3d:{icon:"🔷",name:"3D形状類似検索",badge:"JSOL技術",bClass:"s-jsol",
+    tags:["Simpleware","JVISION","形状記述子"]}
+};
+
+// past_cases: 過去トラブル対策 → 今回設計での対応確認
+// check: "ok"=対応済, "ng"=未対応, "partial"=一部対応
+
+const SYSTEMS = [
+{
+  id:"compressor", label:"コンプレッサー",
+  parts:[
+    // ─ 吐出バルブ ─────────────────────────────────────────────
+    {
+      id:"discharge_valve", label:"吐出バルブ",
+      desc:"高圧側開閉・逆止め機能",
+      faults:[
+        {
+          id:"dv_f1",
+          label:"バルブ破損による\n吐出不良",
+          effect:"冷媒吐出圧力低下→冷凍能力喪失→装置停止",
+          S:9, O:3, D:4,
+          tree:[
+            {
+              id:"dv_f1_l1a", label:"弁体疲労破断",
+              children:[
+                {
+                  id:"dv_f1_l2a", label:"起動・停止時の\n衝撃荷重集中",
+                  children:[
+                    {id:"dv_f1_l3a", label:"弁座当たり面の\n面圧過大設計",
+                     action:"弁座面圧FEM再解析・ヘルツ接触応力確認",
+                     past_cases:[
+                       {year:"2019",title:"吐出バルブ弁体割れ（コンプレッサA型）",
+                        trouble:"起動時サージ圧により弁体根元に応力集中→疲労き裂→破断。定格起動5万回で発生",
+                        counter_measure:"弁体形状をアール付きに変更・材料をSUS304→SUS630へ変更",
+                        design_check:"ok",
+                        design_detail:"今回設計：弁座アール形状を3Dモデル確認済（DR1-2024指摘#12）。SUS630採用をBOMに反映",
+                        refs:["defect","dr","cad"]}
+                     ]
+                    },
+                    {id:"dv_f1_l3b", label:"材料の疲労限界\nマージン不足",
+                     action:"疲労安全率≥1.5確認・S-N曲線照合",
+                     past_cases:[
+                       {year:"2021",title:"弁体材料疲労破壊（B型コンプレッサー）",
+                        trouble:"材料強度評価を静的荷重のみで実施し疲労評価漏れ。量産後18ヶ月で破断",
+                        counter_measure:"設計審査チェックシートに疲労評価必須化",
+                        design_check:"ok",
+                        design_detail:"DR2チェックシート改訂版（2023年）にて疲労評価実施確認欄を追加済",
+                        refs:["past","dr","qc"]}
+                     ]
+                    }
+                  ]
+                },
+                {
+                  id:"dv_f1_l2b", label:"腐食による\n強度低下",
+                  children:[
+                    {id:"dv_f1_l3c", label:"冷媒・油の化学的\n適合性未確認",
+                     action:"材料適合性確認表作成・浸漬試験追加",
+                     past_cases:[
+                       {year:"2022",title:"R32冷媒対応バルブの腐食不具合",
+                        trouble:"従来R410A用バルブをR32に流用。R32の高圧特性とフッ素化学的攻撃で弁座腐食",
+                        counter_measure:"冷媒切替時の材料適合性確認フロー整備",
+                        design_check:"ng",
+                        design_detail:"⚠ 今回設計：R32対応確認表が未作成。DR2指摘#7として残存中",
+                        refs:["defect","past"]}
+                     ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              id:"dv_f1_l1b", label:"弁シートからの\n冷媒漏れ",
+              children:[
+                {
+                  id:"dv_f1_l2c", label:"弁座シール面の\n傷・変形",
+                  children:[
+                    {id:"dv_f1_l3d", label:"異物噛み込みによる\n弁座傷付き",
+                     action:"吸入フィルタ目開き見直し・洗浄工程追加",
+                     past_cases:[
+                       {year:"2020",title:"配管内異物による弁座傷（量産初期ロット）",
+                        trouble:"配管内スケールが起動時に吐出バルブへ流入。初物ロット100台中8台で漏れ発生",
+                        counter_measure:"出荷前エアパージ工程追加・フィルタ追設",
+                        design_check:"ok",
+                        design_detail:"エアパージ工程をQC工程表に追加済み。フィルタ目開き0.3mm→0.15mm変更",
+                        refs:["defect","qc","past"]}
+                     ]
+                    },
+                    {id:"dv_f1_l3e", label:"シート面粗さ\n管理基準なし",
+                     action:"シート面粗さRa≤0.8μm規格設定",
+                     past_cases:[]
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          refs:[
+            {db:"defect",reason:"吐出バルブ破損クレーム事例（8Dレポート群）",link:"#defect-dv"},
+            {db:"cause_db",reason:"LS-DYNA弁体衝撃解析：起動時サージ荷重評価",link:"#lsdyna-valve"},
+            {db:"cae",reason:"弁体疲労破断CAEテンプレート（高圧バルブ用）",link:"#cae-valve"},
+            {db:"dr",reason:"DR2指摘：バルブ破損モード検証不足",link:"#dr2-dv"}
+          ]
+        },
+        {
+          id:"dv_f2",
+          label:"バルブ作動遅れ\n（応答性低下）",
+          effect:"圧縮機効率低下・液バック→軸受損傷",
+          S:7, O:4, D:5,
+          tree:[
+            {
+              id:"dv_f2_l1a", label:"弁体可動部の\n固着・粘着",
+              children:[
+                {
+                  id:"dv_f2_l2a", label:"油汚染による\nスラッジ堆積",
+                  children:[
+                    {id:"dv_f2_l3a", label:"潤滑油劣化管理\n基準の未設定",
+                     action:"油交換インターバル設定・油質定期分析",
+                     past_cases:[
+                       {year:"2018",title:"スラッジ堆積によるバルブ固着（長期使用機）",
+                        trouble:"5年使用機でスラッジがバルブガイド部に堆積。冬季低温時に固着し起動不能",
+                        counter_measure:"潤滑油グレードをFW32→FW46相当に変更・年次点検追加",
+                        design_check:"partial",
+                        design_detail:"油種変更は反映済。定期点検インターバルの設計仕様書への明記が未完了",
+                        refs:["defect","past","qc"]}
+                     ]
+                    }
+                  ]
+                },
+                {
+                  id:"dv_f2_l2b", label:"低温時弁バネの\n弾性低下",
+                  children:[
+                    {id:"dv_f2_l3b", label:"バネ材料の低温\n特性評価漏れ",
+                     action:"-20℃環境試験追加・低温用バネ材料選定",
+                     past_cases:[
+                       {year:"2023",title:"寒冷地仕様バルブの低温固着（北海道市場）",
+                        trouble:"標準仕様バネを寒冷地モデルに流用。−15℃でバネ定数20%低下し弁が開かない",
+                        counter_measure:"寒冷地仕様：低温用ステンレスバネへ変更",
+                        design_check:"ng",
+                        design_detail:"⚠ 寒冷地向け機種の低温バネ評価が未実施。次DR3（2025/03）で対応予定",
+                        refs:["defect","past","cae"]}
+                     ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          refs:[
+            {db:"past",reason:"バルブ作動遅れ対策設計変更履歴",link:"#past-dv2"},
+            {db:"qc",reason:"バルブ応答時間Cpk・検査基準",link:"#qc-dv2"},
+            {db:"cause_db",reason:"弁体動特性解析：スラッジ付着モデル",link:"#cause-dv2"}
+          ]
+        }
+      ]
+    },
+    // ─ 吸入配管 ────────────────────────────────────────────────
+    {
+      id:"suction_pipe", label:"吸入配管",
+      desc:"低圧冷媒ガス導入・振動吸収",
+      faults:[
+        {
+          id:"sp_f1",
+          label:"配管折れ・亀裂\n（振動疲労）",
+          effect:"冷媒漏洩→環境汚染・装置停止",
+          S:9, O:4, D:3,
+          tree:[
+            {
+              id:"sp_f1_l1a", label:"起動・停止時の\n繰返し振動",
+              children:[
+                {
+                  id:"sp_f1_l2a", label:"配管固有振動数と\nコンプレッサー\n加振周波数の一致",
+                  children:[
+                    {id:"sp_f1_l3a", label:"配管長・支持点設計時の\n振動解析未実施",
+                     action:"配管系振動解析（固有値解析）必須化・支持点最適化",
+                     past_cases:[
+                       {year:"2017",title:"吸入配管振動折れ（コンプレッサーB型初期量産）",
+                        trouble:"起動時コンプレッサー振動（60Hz加振）が配管固有振動数62Hzに一致→共振→3ヶ月で亀裂",
+                        counter_measure:"支持ブラケット追加（15cm間隔→8cm）・配管長変更で固有振動数を85Hzへシフト",
+                        design_check:"ok",
+                        design_detail:"今回設計：FEM固有値解析実施済（固有振動数94Hz確認）。支持ブラケット配置をCAD図面に反映",
+                        refs:["defect","cad","cause_db","dr"]}
+                     ]
+                    },
+                    {id:"sp_f1_l3b", label:"コンプレッサー\n起動トルク変動の\n考慮漏れ",
+                     action:"起動時加振力をFEM入力条件に追加",
+                     past_cases:[
+                       {year:"2021",title:"インバーター機の低周波振動による配管折れ",
+                        trouble:"インバーター制御の低速域（10-20Hz）でトルクリプルが大きく、配管が低周波共振",
+                        counter_measure:"インバーター機専用の配管振動解析仕様書作成",
+                        design_check:"partial",
+                        design_detail:"インバーター加振条件を解析に追加済。ただし10Hz以下の超低速域が未評価",
+                        refs:["defect","cause_db","cae"]}
+                     ]
+                    }
+                  ]
+                },
+                {
+                  id:"sp_f1_l2b", label:"配管曲げ部への\n応力集中",
+                  children:[
+                    {id:"sp_f1_l3c", label:"曲げR不足\n（急曲げ設計）",
+                     action:"最小曲げR=管径×3D以上を設計基準化",
+                     past_cases:[
+                       {year:"2019",title:"配管曲げ部クラック（コンパクト化設計変更後）",
+                        trouble:"機器コンパクト化で曲げRを管径×1.5Dに縮小。振動との複合で曲げ部に亀裂",
+                        counter_measure:"曲げR≥2.5D規定をGDL（設計ガイドライン）に追加",
+                        design_check:"ok",
+                        design_detail:"設計GDL Rev.8（2022年）に曲げR≥3D規定追加済。CAD設計チェック必須化",
+                        refs:["defect","past","cad"]}
+                     ]
+                    },
+                    {id:"sp_f1_l3d", label:"溶接・ロウ付け部\n強度評価なし",
+                     action:"接合部強度試験・非破壊検査（PT）追加",
+                     past_cases:[
+                       {year:"2020",title:"ロウ付け部からの冷媒漏れ（量産5年後）",
+                        trouble:"振動によりロウ付け部に繰返し応力→ボイドを起点に亀裂伝播",
+                        counter_measure:"ロウ付け工程の全数X線検査導入・ボイド率基準設定",
+                        design_check:"ok",
+                        design_detail:"X線検査基準書（QC-P-0234）策定済。ボイド率3%以下を合否判定基準に設定",
+                        refs:["defect","qc","past"]}
+                     ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              id:"sp_f1_l1b", label:"液バックによる\n急激圧力変動",
+              children:[
+                {
+                  id:"sp_f1_l2c", label:"停止時の液冷媒\n吸入配管への逆流",
+                  children:[
+                    {id:"sp_f1_l3e", label:"逆止弁の応答遅れ\n（閉じ遅れ）",
+                     action:"逆止弁応答時間仕様化・作動試験全数実施",
+                     past_cases:[
+                       {year:"2022",title:"停止時液バックによる配管破裂（突然停止ケース）",
+                        trouble:"停電による突然停止時に逆止弁閉じ遅れ→液バック→吸入配管に水撃圧→破裂",
+                        counter_measure:"逆止弁応答時間≤0.1秒の仕様追加・突然停止シーケンス見直し",
+                        design_check:"ok",
+                        design_detail:"逆止弁仕様書に応答時間0.08秒記載済。停止シーケンスプログラム変更完了",
+                        refs:["defect","past","qc"]}
+                     ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          refs:[
+            {db:"defect",reason:"吸入配管折れ・漏洩クレーム事例一覧",link:"#defect-sp"},
+            {db:"cause_db",reason:"LS-DYNA配管振動解析：起動停止サイクル疲労評価",link:"#lsdyna-pipe"},
+            {db:"cae",reason:"配管系固有値解析テンプレート",link:"#cae-pipe"},
+            {db:"cad",reason:"配管支持ブラケット配置図・GD&T",link:"#cad-pipe"}
+          ]
+        },
+        {
+          id:"sp_f2",
+          label:"配管内結露・\n液溜まり",
+          effect:"液圧縮→コンプレッサー弁破損・液バック",
+          S:8, O:3, D:5,
+          tree:[
+            {
+              id:"sp_f2_l1a", label:"配管サクションライン\nの断熱不足",
+              children:[
+                {
+                  id:"sp_f2_l2a", label:"断熱材仕様の\n温度条件不足",
+                  children:[
+                    {id:"sp_f2_l3a", label:"高湿度環境での\n結露評価未実施",
+                     action:"高温多湿環境試験（40℃/90%RH）追加実施",
+                     past_cases:[
+                       {year:"2021",title:"東南アジア向け機の液バック（高湿度環境）",
+                        trouble:"日本仕様の断熱材を東南アジア向けに流用。湿度95%環境で結露→液溜まり→液圧縮",
+                        counter_measure:"輸出先気候条件別の断熱材仕様マトリックス整備",
+                        design_check:"partial",
+                        design_detail:"アジア向け仕様は対応済。中東・アフリカ向けの高温乾燥条件が未評価",
+                        refs:["defect","past","qc"]}
+                     ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          refs:[
+            {db:"past",reason:"結露・液バック対策設計変更履歴",link:"#past-sp2"},
+            {db:"defect",reason:"液バック不具合クレーム（地域別集計）",link:"#defect-sp2"}
+          ]
+        }
+      ]
+    },
+    // ─ メインベアリング ─────────────────────────────────────────
+    {
+      id:"main_bearing", label:"メインベアリング",
+      desc:"クランク軸支持・ラジアル・スラスト荷重受け",
+      faults:[
+        {
+          id:"mb_f1",
+          label:"ベアリング焼き付き\n・早期摩耗",
+          effect:"コンプレッサーロック→装置完全停止",
+          S:10, O:2, D:4,
+          tree:[
+            {
+              id:"mb_f1_l1a", label:"油膜切れによる\n金属接触",
+              children:[
+                {
+                  id:"mb_f1_l2a", label:"起動直後の\n油圧形成遅れ",
+                  children:[
+                    {id:"mb_f1_l3a", label:"オイルポンプ吐出量の\n設計不足（低速域）",
+                     action:"低速域油圧特性確認・ポンプ吐出量再計算",
+                     past_cases:[
+                       {year:"2016",title:"インバーター低速時ベアリング焼き付き（初量産）",
+                        trouble:"インバーター15Hz運転時にオイルポンプ吐出量不足。必要油圧0.15MPaに対し0.08MPaしか発生せず→焼き付き",
+                        counter_measure:"オイルポンプをギアポンプ→トロコイドポンプへ変更。低速域吐出量1.8倍改善",
+                        design_check:"ok",
+                        design_detail:"今回設計：トロコイドポンプ採用。15Hz運転時油圧0.22MPa確認済（DR1-2024）",
+                        refs:["defect","past","dr","cause_db"]}
+                     ]
+                    },
+                    {id:"mb_f1_l3b", label:"オイルセパレーター\n分離効率低下",
+                     action:"オイルセパレーター分離効率検証試験追加",
+                     past_cases:[
+                       {year:"2019",title:"オイル不足による軸受摩耗（長期低負荷運転）",
+                        trouble:"低負荷長時間運転でオイルが冷媒に溶け込み循環。オイルセパレーターが高圧対応品でなく分離不足",
+                        counter_measure:"高圧対応オイルセパレーターへ変更・オイル量センシング追加",
+                        design_check:"ok",
+                        design_detail:"高圧対応セパレーター（型番X-2045）採用済。オイルレベルセンサー回路設計完了",
+                        refs:["defect","past","qc"]}
+                     ]
+                    }
+                  ]
+                },
+                {
+                  id:"mb_f1_l2b", label:"軸受クリアランス\n設計外れ",
+                  children:[
+                    {id:"mb_f1_l3c", label:"熱膨張による\nクリアランス消失",
+                     action:"熱変形解析実施・クリアランス温度補正設計",
+                     past_cases:[
+                       {year:"2020",title:"高温環境下クリアランス消失→焼き付き",
+                        trouble:"周囲温度43℃環境下でシャフト・ハウジング熱膨張差によりクリアランス消失。設計値0.03mmが0.00mmに",
+                        counter_measure:"熱変形解析を設計プロセスに必須化・クリアランス+0.01mm補正",
+                        design_check:"ok",
+                        design_detail:"熱変形解析（JMAG-Thermal連成）実施済。クリアランス0.04mm→0.002mm確保確認",
+                        refs:["defect","cause_db","cae","past"]}
+                     ]
+                    },
+                    {id:"mb_f1_l3d", label:"加工精度不足\n（真円度・円筒度）",
+                     action:"真円度Cpk≥1.33設定・全数形状測定",
+                     past_cases:[
+                       {year:"2018",title:"加工精度不足による初期摩耗（量産移管後）",
+                        trouble:"開発機は専用機加工→量産機は汎用旋盤加工。真円度3μm→8μmに悪化し油膜形成不良",
+                        counter_measure:"軸受孔の真円度規格を3μm以下に設定・専用ホーニング工程追加",
+                        design_check:"ok",
+                        design_detail:"真円度2.5μm以下をQC工程表に設定済。専用ホーニング設備の能力確認完了",
+                        refs:["defect","qc","cad","past"]}
+                     ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              id:"mb_f1_l1b", label:"異物混入による\n表面傷付き",
+              children:[
+                {
+                  id:"mb_f1_l2c", label:"組付け時の\n金属切粉混入",
+                  children:[
+                    {id:"mb_f1_l3e", label:"組立ライン洗浄\n工程の不備",
+                     action:"マグネットフィルタ設置・洗浄液清浄度管理",
+                     past_cases:[
+                       {year:"2022",title:"組立後初動試験での軸受傷付き（量産新ライン）",
+                        trouble:"新設組立ラインで加工屑除去工程を省略。0.5mm切粉がベアリング内に残存→起動時傷",
+                        counter_measure:"全数マグネット検査工程追加・洗浄液NAS6等級管理",
+                        design_check:"ok",
+                        design_detail:"マグネット検査工程をQC工程表P-0156に追加済。洗浄液清浄度NAS6管理開始",
+                        refs:["defect","qc","past"]}
+                     ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          refs:[
+            {db:"defect",reason:"ベアリング焼き付きクレーム事例（市場品質報告書）",link:"#defect-mb"},
+            {db:"cause_db",reason:"JMAG熱・応力連成解析：軸受焼き付きメカニズム",link:"#jmag-bearing"},
+            {db:"cae",reason:"油膜圧力解析テンプレート（動圧軸受用）",link:"#cae-bearing"},
+            {db:"qc",reason:"軸受クリアランスCpk実績・加工基準書",link:"#qc-bearing"},
+            {db:"past",reason:"軸受設計変更履歴（6世代分）",link:"#past-bearing"}
+          ]
+        }
+      ]
+    }
+  ]
+},
+// ─ ファンモーター ─────────────────────────────────────────────────
+{
+  id:"fan_motor", label:"ファンモーター",
+  parts:[
+    {
+      id:"rotor_assy", label:"ロータアセンブリ",
+      desc:"回転子・磁石・バランスウェイト",
+      faults:[
+        {
+          id:"ra_f1",
+          label:"磁石脱落・飛散\n（回転中）",
+          effect:"ファン停止・機械的破損・周辺部品損傷",
+          S:10, O:2, D:4,
+          tree:[
+            {
+              id:"ra_f1_l1a", label:"遠心力・熱サイクルによる\n接着界面剥離",
+              children:[
+                {
+                  id:"ra_f1_l2a", label:"接着剤設計寿命の\n検証不足",
+                  children:[
+                    {id:"ra_f1_l3a", label:"熱×振動×遠心力の\n複合荷重評価漏れ",
+                     action:"複合荷重試験（温度サイクル+振動+遠心力同時）追加",
+                     past_cases:[
+                       {year:"2020",title:"ファンモーター磁石脱落（海外向け機種）",
+                        trouble:"輸送時振動と使用時温度サイクル複合で接着劣化。2年使用で4台から磁石脱落報告",
+                        counter_measure:"接着剤をエポキシ→嫌気性構造接着剤へ変更・全数引張強度試験導入",
+                        design_check:"ok",
+                        design_detail:"嫌気性接着剤（製品番号:L-271）採用済。全数引張試験：破断荷重≥800N合否基準設定",
+                        refs:["defect","past","qc","cae"]}
+                     ]
+                    },
+                    {id:"ra_f1_l3b", label:"接着剤の長期\n耐熱性能未評価",
+                     action:"85℃×1000h耐熱試験実施・接着力劣化率確認",
+                     past_cases:[
+                       {year:"2023",title:"高温設置環境での磁石緩み（屋外ユニット）",
+                        trouble:"南向き直射日光環境でユニット内部60℃超。既存接着剤のTg=55℃以下となり接着強度40%低下",
+                        counter_measure:"Tg>80℃の高耐熱グレード接着剤への変更検討中",
+                        design_check:"ng",
+                        design_detail:"⚠ 高耐熱接着剤の選定・評価が未完了。DR3（2025/02）対応項目として管理中",
+                        refs:["defect","past","cause_db"]}
+                     ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              id:"ra_f1_l1b", label:"バインドテープの\n緩み・切断",
+              children:[
+                {
+                  id:"ra_f1_l2b", label:"テープ巻き付け\nトルクの管理不備",
+                  children:[
+                    {id:"ra_f1_l3c", label:"巻付け工程の\n自動化不完全\n（手作業依存）",
+                     action:"自動巻付け機導入・テープ張力管理数値化",
+                     past_cases:[
+                       {year:"2021",title:"バインドテープ切断による磁石緩み（量産ロット）",
+                        trouble:"手巻き工程での張力バラツキ大。テープ破断強度の30%未満の張力で巻かれた個体が脱落",
+                        counter_measure:"半自動巻付け機導入・トルクセンサー付き管理システム",
+                        design_check:"partial",
+                        design_detail:"半自動化設備導入済。全自動化は次期設備投資計画（FY2026）に計上",
+                        refs:["defect","qc","past"]}
+                     ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          refs:[
+            {db:"defect",reason:"磁石脱落クレーム事例・市場品質報告書",link:"#defect-magnet"},
+            {db:"cause_db",reason:"JMAG遠心力・熱応力連成解析テンプレート",link:"#jmag-magnet"},
+            {db:"qc",reason:"磁石引張強度全数試験基準書",link:"#qc-magnet"},
+            {db:"shape3d",reason:"類似ロータ形状の過去不具合横展開検索",link:"#shape3d-rotor"}
+          ]
+        }
+      ]
+    },
+    {
+      id:"motor_bearing", label:"モーター軸受",
+      desc:"ラジアル荷重・スラスト荷重・潤滑",
+      faults:[
+        {
+          id:"bmf1",
+          label:"グリース漏れ・\n潤滑不足",
+          effect:"軸受焼き付き→ファン停止→熱交換器過熱",
+          S:8, O:4, D:4,
+          tree:[
+            {
+              id:"bmf1_l1a", label:"シール設計不良による\nグリース流出",
+              children:[
+                {
+                  id:"bmf1_l2a", label:"シール溝面圧の\n設計ミス",
+                  children:[
+                    {id:"bmf1_l3a", label:"温度変化によるシール材\n膨潤・収縮の未考慮",
+                     action:"シール材熱変形解析・温度サイクル後の密封試験",
+                     past_cases:[
+                       {year:"2019",title:"高温環境下でのシールリップ硬化→グリース漏れ",
+                        trouble:"夏季高温時（80℃以上）にNBRシールが硬化しリップ追従性喪失。漏れ多発",
+                        counter_measure:"シール材をNBR→FKM（フッ素ゴム）に変更",
+                        design_check:"ok",
+                        design_detail:"FKM材シール採用済（仕様書S-0892改訂）。−30〜+120℃対応確認",
+                        refs:["defect","past","qc"]}
+                     ]
+                    },
+                    {id:"bmf1_l3b", label:"振動によるシールリップ\n疲労摩耗",
+                     action:"振動耐久試験（50Hzランダム振動1000h）追加",
+                     past_cases:[
+                       {year:"2022",title:"振動環境下でのシール摩耗→グリース漏れ",
+                        trouble:"屋外ユニット風振動（不規則）によりシールリップが摩耗。1年で漏れ発生",
+                        counter_measure:"シールリップ形状をダブルリップへ変更",
+                        design_check:"ok",
+                        design_detail:"ダブルリップシール採用済（型番DS-445）",
+                        refs:["defect","past","cad"]}
+                     ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          refs:[
+            {db:"defect",reason:"グリース漏れクレーム事例（屋外ユニット別集計）",link:"#defect-bearing-grease"},
+            {db:"qc",reason:"グリース充填量Cpk・密封試験基準",link:"#qc-bearing-grease"},
+            {db:"cae",reason:"Moldex3Dシール流動解析テンプレート",link:"#cae-seal"}
+          ]
+        }
+      ]
+    }
+  ]
+}
+];
+
+// ═══════════════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════════════
+let st = { sysIdx:null, partIdx:null, faultIdx:null, view:'tree', detail:null };
+
+// ═══════════════════════════════════════════════════════════════════
+// INIT NAV
+// ═══════════════════════════════════════════════════════════════════
+function buildNav(){
+  const nav = document.getElementById('nav');
+  let h = '<div class="nav-section">システム</div>';
+  SYSTEMS.forEach((sys,si)=>{
+    const totalFaults = sys.parts.reduce((s,p)=>s+p.faults.length,0);
+    h += `<div class="sys-item${st.sysIdx===si?' active':''}" onclick="selectSys(${si})">
+      <div class="sys-name">${sys.label}</div>
+      <div class="sys-meta">構成部品 ${sys.parts.length} / 不具合 ${totalFaults}</div>
+    </div>`;
+    if(st.sysIdx===si){
+      h += '<div class="part-group">';
+      sys.parts.forEach((p,pi)=>{
+        const ngCount = p.faults.reduce((s,f)=>{
+          let n=0;
+          function walk(nodes){nodes.forEach(n2=>{if(n2.past_cases)n2.past_cases.forEach(pc=>{if(pc.design_check==='ng')n++;});if(n2.children)walk(n2.children);});}
+          walk(f.tree); return s+n;
+        },0);
+        h += `<div class="part-item${st.partIdx===pi?' active':''}" onclick="selectPart(${si},${pi})">
+          <div class="pname">${p.label}${ngCount>0?`<span class="fault-count">!${ngCount}</span>`:''}</div>
+          <div class="pmeta">${p.desc} | ${p.faults.length}事象</div>
+        </div>`;
+      });
+      h += '</div>';
+    }
+  });
+  nav.innerHTML = h;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SELECT
+// ═══════════════════════════════════════════════════════════════════
+function selectSys(si){
+  st.sysIdx=si; st.partIdx=null; st.faultIdx=null; st.detail=null;
+  buildNav(); updateBreadcrumb(); closePanel();
+  document.getElementById('hint').style.display='block';
+  document.getElementById('canvas').style.display='none';
+}
+
+function selectPart(si,pi){
+  st.sysIdx=si; st.partIdx=pi; st.faultIdx=null; st.detail=null;
+  buildNav(); updateBreadcrumb(); closePanel();
+  document.getElementById('hint').style.display='none';
+  document.getElementById('canvas').style.display='block';
+  if(st.view==='tree') drawTree();
+  else drawList();
+}
+
+function updateBreadcrumb(){
+  const bc = document.getElementById('breadcrumb');
+  if(st.sysIdx===null){bc.innerHTML='<span>システムを選択</span>';return;}
+  const sys=SYSTEMS[st.sysIdx];
+  let h=`<span>${sys.label}</span>`;
+  if(st.partIdx!==null){
+    h+=`<span class="bc-sep">›</span><span class="active">${sys.parts[st.partIdx].label}</span>`;
+  }
+  bc.innerHTML=h;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// TREE DRAWING
+// ═══════════════════════════════════════════════════════════════════
+function countLeaves(node){
+  if(!node.children||!node.children.length) return 1;
+  return node.children.reduce((s,c)=>s+countLeaves(c),0);
+}
+
+const ROW=62, COL_W=155, COL_GAP=22, FAULT_W=148, PAD_TOP=20;
+
+function drawTree(){
+  const part = SYSTEMS[st.sysIdx].parts[st.partIdx];
+  const faults = part.faults;
+
+  // Count total rows
+  let totalLeaves=0;
+  faults.forEach(f=>{
+    let fl=0;
+    f.tree.forEach(l1=>fl+=countLeaves(l1));
+    totalLeaves+=fl;
+  });
+
+  const H = totalLeaves*ROW + PAD_TOP*2;
+  const maxDepth = 4; // fault, l1, l2, l3, action
+  const W = FAULT_W + (COL_W+COL_GAP)*4 + 40;
+
+  const canvas = document.getElementById('canvas');
+  canvas.style.width=W+'px';
+  canvas.style.height=H+'px';
+
+  let nodes=[], edges=[];
+
+  let leafRow=0;
+  faults.forEach((f,fi)=>{
+    let fLeaves=0;
+    f.tree.forEach(l1=>fLeaves+=countLeaves(l1));
+
+    const fY = PAD_TOP + leafRow*ROW + (fLeaves*ROW - 52)/2;
+    nodes.push({
+      id:f.id, type:'fault', label:f.label,
+      x:10, y:fY, w:FAULT_W, h:52,
+      fault:f, selected:(st.faultIdx===fi)
+    });
+
+    let l1Row=leafRow;
+    f.tree.forEach((l1,l1i)=>{
+      const l1Leaves=countLeaves(l1);
+      const l1Y = PAD_TOP + l1Row*ROW + (l1Leaves*ROW-42)/2;
+      const l1x = FAULT_W+COL_GAP;
+      nodes.push({id:l1.id, type:'l1', label:l1.label, x:l1x, y:l1Y, w:COL_W, h:42, faultId:f.id});
+      edges.push({from:f.id, to:l1.id, dashed:false});
+
+      let l2Row=l1Row;
+      (l1.children||[]).forEach((l2,l2i)=>{
+        const l2Leaves=countLeaves(l2);
+        const l2Y = PAD_TOP + l2Row*ROW + (l2Leaves*ROW-42)/2;
+        const l2x = FAULT_W+COL_GAP + COL_W+COL_GAP;
+        nodes.push({id:l2.id, type:'l2', label:l2.label, x:l2x, y:l2Y, w:COL_W, h:42, faultId:f.id});
+        edges.push({from:l1.id, to:l2.id, dashed:false});
+
+        let l3Row=l2Row;
+        (l2.children||[]).forEach((l3,l3i)=>{
+          const l3Y = PAD_TOP + l3Row*ROW;
+          const l3x = FAULT_W+COL_GAP + (COL_W+COL_GAP)*2;
+          // Determine badge
+          let badge='';
+          if(l3.past_cases && l3.past_cases.length>0){
+            const allOk = l3.past_cases.every(p=>p.design_check==='ok');
+            const anyNg = l3.past_cases.some(p=>p.design_check==='ng');
+            if(anyNg) badge='ng';
+            else if(allOk) badge='ok';
+            else badge='partial';
+          }
+          nodes.push({id:l3.id, type:'l3', label:l3.label, x:l3x, y:l3Y, w:COL_W, h:42,
+            faultId:f.id, past_cases:l3.past_cases, badge});
+          edges.push({from:l2.id, to:l3.id, dashed:false});
+
+          // Action
+          const ax = FAULT_W+COL_GAP + (COL_W+COL_GAP)*3;
+          nodes.push({id:l3.id+'_act', type:'action', label:l3.action||'', x:ax, y:l3Y, w:COL_W, h:38,
+            faultId:f.id});
+          edges.push({from:l3.id, to:l3.id+'_act', dashed:true});
+
+          l3Row+=1;
+        });
+        l2Row+=l2Leaves;
+      });
+      l1Row+=l1Leaves;
+    });
+    leafRow+=fLeaves;
+  });
+
+  // SVG
+  const nodeMap={};
+  nodes.forEach(n=>nodeMap[n.id]=n);
+  let svg=`<svg class="tree-svg" width="${W}" height="${H}">`;
+  edges.forEach(e=>{
+    const s=nodeMap[e.from], t=nodeMap[e.to];
+    if(!s||!t) return;
+    const x1=s.x+s.w, y1=s.y+s.h/2;
+    const x2=t.x,     y2=t.y+t.h/2;
+    const mx=(x1+x2)/2;
+    const col=e.dashed?'rgba(255,209,102,.5)':'rgba(74,158,255,.35)';
+    const dash=e.dashed?'stroke-dasharray="6,4"':'';
+    svg+=`<path d="M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}"
+      fill="none" stroke="${col}" stroke-width="1.3" ${dash}/>`;
+  });
+  svg+='</svg>';
+
+  // Node HTML
+  let html=svg;
+  nodes.forEach(n=>{
+    const typeClass = `node-${n.type}`;
+    const selStyle = n.selected?'box-shadow:0 0 0 2px #fff,0 0 0 4px #ff4d6d,0 0 24px rgba(255,77,109,.4);':'';
+    let badge='';
+    if(n.badge==='ok') badge='<div class="node-check-badge">✓</div>';
+    else if(n.badge==='ng') badge='<div class="node-ng-badge">!</div>';
+    else if(n.badge==='partial') badge='<div class="node-past-badge">△</div>';
+    else if(n.past_cases&&n.past_cases.length>0) badge='<div class="node-past-badge">過去事例</div>';
+
+    const onclick = n.type==='fault'
+      ? `onclick="selectFault('${n.faultId||n.id}')"`
+      : (n.faultId ? `onclick="selectFault('${n.faultId}')"` : '');
+
+    const lines = n.label.split('\n').map(l=>`<span style="display:block">${l}</span>`).join('');
+    html+=`<div class="${typeClass}" style="left:${n.x}px;top:${n.y}px;width:${n.w}px;min-height:${n.h}px;position:absolute;${selStyle}" ${onclick}>
+      ${badge}${lines}
+    </div>`;
+  });
+
+  canvas.innerHTML=html;
+}
+
+function selectFault(faultId){
+  const part=SYSTEMS[st.sysIdx].parts[st.partIdx];
+  const fi=part.faults.findIndex(f=>f.id===faultId);
+  if(fi<0) return;
+  st.faultIdx=fi;
+  drawTree();
+  showPanel(part.faults[fi]);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// PANEL
+// ═══════════════════════════════════════════════════════════════════
+function showPanel(f){
+  const r=f.S*f.O*f.D;
+  const pct=Math.round(r/1000*100);
+  const rcls=r>=200?'rpn-h':r>=80?'rpn-m':'rpn-l';
+  const rlbl=r>=200?'要処置▲':r>=80?'監視△':'許容○';
+  const rcol=r>=200?'#ff4d6d':r>=80?'#ff8800':'#22d47a';
+
+  // Count past cases
+  let pastNodes=[];
+  function collectPast(nodes){
+    nodes.forEach(n=>{
+      if(n.past_cases&&n.past_cases.length>0){
+        n.past_cases.forEach(pc=>pastNodes.push({nodeName:n.label, ...pc}));
+      }
+      if(n.children) collectPast(n.children);
+    });
+  }
+  collectPast(f.tree);
+
+  const ngCount=pastNodes.filter(p=>p.design_check==='ng').length;
+  const okCount=pastNodes.filter(p=>p.design_check==='ok').length;
+  const partialCount=pastNodes.filter(p=>p.design_check==='partial').length;
+
+  let pastHtml = pastNodes.map(p=>{
+    const cls=p.design_check==='ok'?'check-ok':p.design_check==='ng'?'check-ng':'check-partial';
+    const lbl=p.design_check==='ok'?'✓ 今回設計: 対応済':p.design_check==='ng'?'! 今回設計: 未対応':'△ 今回設計: 一部対応';
+    const dcls=p.design_check==='ok'?'dc-ok':p.design_check==='ng'?'dc-ng':'dc-partial';
+    const refs=(p.refs||[]).map(r=>`<span class="ref-tag">${DB_SOURCES[r]?.name.slice(0,8)||r}</span>`).join('');
+    return `<div class="past-card">
+      <div class="past-head">
+        <span class="past-year">${p.year}</span>
+        <span class="past-name">${p.title}</span>
+        <span class="past-check ${cls}">${lbl.split(':')[0]}</span>
+      </div>
+      <div class="past-body">
+        <div class="past-trouble">${p.trouble}</div>
+        <div class="past-counter">
+          <div class="past-counter-l">過去の対策</div>
+          <div class="past-counter-v">${p.counter_measure}</div>
+        </div>
+        <div class="past-design-check ${dcls}">${p.design_detail}</div>
+        <div class="past-refs">${refs}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  let refsHtml=(f.refs||[]).map(ref=>{
+    const d=DB_SOURCES[ref.db];
+    if(!d) return '';
+    return `<div class="db-card">
+      <div class="db-head">
+        <span class="db-icon">${d.icon}</span>
+        <span class="db-name">${d.name}</span>
+        <span class="db-status ${d.bClass}">${d.badge}</span>
+      </div>
+      <div class="db-reason">${ref.reason}</div>
+      <div class="db-tags">${d.tags.map(t=>`<span class="db-tag">${t}</span>`).join('')}</div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('rp-inner').innerHTML=`
+    <span class="rp-close" onclick="closePanel()">✕ 閉じる</span>
+    <div class="rp-title">${f.label.replace(/\n/g,' ')}</div>
+    <div class="rp-effect">${f.effect}</div>
+
+    <div class="sod-row">
+      <div class="sod-cell"><div class="sod-l">S 重大度</div>
+        <div class="sod-v" style="color:${f.S>=9?'#ff4d6d':f.S>=7?'#ff8800':'#22d47a'}">${f.S}</div>
+        <div class="sod-d">${f.S>=9?'危険（安全）':f.S>=7?'高（主機能）':'中（低下）'}</div></div>
+      <div class="sod-cell"><div class="sod-l">O 発生頻度</div>
+        <div class="sod-v">${f.O}</div>
+        <div class="sod-d">${f.O>=7?'高頻度':f.O>=4?'中程度':'低頻度'}</div></div>
+      <div class="sod-cell"><div class="sod-l">D 検出度</div>
+        <div class="sod-v">${f.D}</div>
+        <div class="sod-d">${f.D>=7?'検出困難':f.D>=4?'中程度':'容易'}</div></div>
+    </div>
+    <div class="rpn-row">
+      <span style="font-size:10px;color:var(--text3)">RPN =</span>
+      <span class="rpn-num" style="color:${rcol}">${r}</span>
+      <div class="rpn-track"><div class="rpn-fill" style="width:${pct}%;background:${rcol}"></div></div>
+      <span class="rpn-badge ${rcls}">${rlbl}</span>
+    </div>
+
+    <div class="section-title">
+      📋 過去トラブル対策 × 今回設計対応確認
+      <span style="margin-left:auto;font-size:10px;display:flex;gap:5px;">
+        <span style="background:var(--green-bg);color:var(--green);padding:1px 5px;border-radius:3px;">✓${okCount}</span>
+        <span style="background:var(--orange-bg);color:var(--orange);padding:1px 5px;border-radius:3px;">△${partialCount}</span>
+        ${ngCount>0?`<span style="background:var(--red-bg);color:var(--red);padding:1px 5px;border-radius:3px;">!${ngCount}未対応</span>`:''}
+      </span>
+    </div>
+    ${pastHtml||'<div style="color:var(--text3);font-size:11px;padding:8px 0">過去事例データなし</div>'}
+
+    <div class="section-title">🔗 引用DB・根拠リンク</div>
+    ${refsHtml}
+  `;
+
+  document.getElementById('rpanel').classList.remove('closed');
+}
+
+function closePanel(){
+  st.faultIdx=null;
+  document.getElementById('rpanel').classList.add('closed');
+  if(st.partIdx!==null&&st.view==='tree') drawTree();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// LIST VIEW
+// ═══════════════════════════════════════════════════════════════════
+function drawList(){
+  if(st.partIdx===null) return;
+  const part=SYSTEMS[st.sysIdx].parts[st.partIdx];
+  let h=`<table class="fault-table"><thead><tr>
+    <th>不具合事象</th><th>影響</th><th>S</th><th>O</th><th>D</th><th>RPN</th>
+    <th>過去対策</th><th>未対応</th>
+  </tr></thead><tbody>`;
+  part.faults.forEach((f,fi)=>{
+    const r=f.S*f.O*f.D;
+    const rcls=r>=200?'rpn-h':r>=80?'rpn-m':'rpn-l';
+    let ngCnt=0,okCnt=0,partCnt=0;
+    function countChecks(nodes){nodes.forEach(n=>{
+      if(n.past_cases)n.past_cases.forEach(p=>{
+        if(p.design_check==='ok')okCnt++;
+        else if(p.design_check==='ng')ngCnt++;
+        else partCnt++;
+      });
+      if(n.children)countChecks(n.children);
+    });}
+    countChecks(f.tree);
+    const ng=ngCnt>0?`<span style="color:var(--red);font-weight:700">!${ngCnt}</span>`:
+      `<span style="color:var(--green)">✓</span>`;
+    h+=`<tr onclick="setView('tree');selectFault('${f.id}')">
+      <td style="color:var(--red);font-weight:600">${f.label.replace('\n',' ')}</td>
+      <td style="font-size:10px;max-width:150px">${f.effect}</td>
+      <td style="text-align:center;font-weight:700;color:${f.S>=9?'#ff4d6d':f.S>=7?'#ff8800':'#22d47a'}">${f.S}</td>
+      <td style="text-align:center">${f.O}</td>
+      <td style="text-align:center">${f.D}</td>
+      <td style="text-align:center"><span class="rpn-badge ${rcls}">${r}</span></td>
+      <td style="font-size:10px">${okCnt}件対応済 / ${partCnt}件一部 / ${ngCnt}件未対応</td>
+      <td style="text-align:center">${ng}</td>
+    </tr>`;
+  });
+  h+='</tbody></table>';
+  document.getElementById('list-view').innerHTML=h;
+}
+
+function setView(v){
+  st.view=v;
+  document.getElementById('btn-tree').classList.toggle('active',v==='tree');
+  document.getElementById('btn-list').classList.toggle('active',v==='list');
+  document.getElementById('tree-view').style.display=v==='tree'?'flex':'none';
+  document.getElementById('list-view').style.display=v==='list'?'block':'none';
+  if(st.partIdx===null) return;
+  if(v==='tree') drawTree(); else drawList();
+}
+
+// Init
+buildNav();
+</script>
+</body>
+</html>
